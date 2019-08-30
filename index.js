@@ -15,7 +15,7 @@ async function main() {
 
     const { User } = await db
 
-    const PORT = 5000
+    const PORT = process.env.PORT || 5000
     const SALT_ROUNDS = 10
     const SECRET = process.env.SECRET
 
