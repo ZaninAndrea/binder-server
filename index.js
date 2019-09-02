@@ -11,7 +11,11 @@ require("dotenv").config()
 async function main() {
     const app = express()
     app.use(cors())
-    app.use(bodyParser.json())
+    app.use(
+        bodyParser.json({
+            limit: 10 * 1024 * 1024,
+        })
+    )
 
     const { User } = await db
 
