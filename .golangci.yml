@@ -1,0 +1,30 @@
+linters-settings:
+    errcheck:
+        check-type-assertions: true
+    gocritic:
+        enabled-tags:
+            - diagnostic
+            - experimental
+            - opinionated
+            - performance
+            - style
+
+linters:
+    disable-all: true
+    enable:
+        - errcheck
+        - gocritic
+        - gosimple
+        - govet
+        - ineffassign
+        - staticcheck
+        - typecheck
+        - unused
+        - bodyclose
+        - durationcheck
+        - godox
+        - goconst
+        - gosec
+
+run:
+    issues-exit-code: 1
