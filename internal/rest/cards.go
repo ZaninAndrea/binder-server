@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"log"
 	"math"
 	"net/http"
 	"time"
@@ -345,6 +346,17 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 		}
 		cardId := c.Param("cardId")
 
+		// Determine to which calendar day the repetition belongs
+		location, err := time.LoadLocation(user.Timezone)
+		if err != nil {
+			log.Println(err)
+			location = time.UTC
+		}
+		dayOfRepetition := payload.Date.
+			Add(-time.Hour * time.Duration(user.EndOfDay)).
+			In(location).
+			Format("2006-01-02")
+
 		_, err = db.Transaction(
 			30*time.Second,
 			func(db *mongo.Database, s mongo.SessionContext) (any, error) {
@@ -378,6 +390,34 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 					"cards.id": cardId,
 				}, mongo.UpdateDocument{
 					op.Set: cardUpdate,
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				// Initialize the user's daily repetitions count if needed
+				repetitionsField := "statistics.dailyRepetitions." + dayOfRepetition
+				_, err = db.Users.UpdateOne(bson.M{
+					"_id": user.ID,
+					repetitionsField: bson.M{
+						string(op.Exists): false,
+					},
+				}, mongo.UpdateDocument{
+					op.Set: {
+						repetitionsField: 0,
+					},
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				// Increment the user's daily repetitions count
+				_, err = db.Users.UpdateOne(bson.M{
+					"_id": user.ID,
+				}, mongo.UpdateDocument{
+					op.Inc: bson.M{
+						repetitionsField: 1,
+					},
 				})
 				if err != nil {
 					return nil, err

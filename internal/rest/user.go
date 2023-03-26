@@ -72,6 +72,11 @@ func setupUserRoutes(r *gin.Engine, db *mongo.Database, jwtSecret []byte) {
 			Email:    payload.Email,
 			Password: password,
 			Plan:     mongo.BasicPlan,
+			Timezone: "Europe/Rome",
+			EndOfDay: 2,
+			Statistics: mongo.UserStatistics{
+				DailyRepetitions: map[string]int{},
+			},
 		})
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Failed to create a new user")

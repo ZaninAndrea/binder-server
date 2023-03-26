@@ -37,11 +37,18 @@ const (
 	BasicPlan UserPlan = "BASIC"
 )
 
+type UserStatistics struct {
+	DailyRepetitions map[string]int `bson:"dailyRepetitions" json:"dailyRepetitions"`
+}
+
 type User struct {
 	BasicModel `bson:",inline"`
-	Email      string   `bson:"email" json:"email"`
-	Password   string   `bson:"password" json:"-"`
-	Plan       UserPlan `bson:"plan" json:"plan"`
+	Email      string         `bson:"email" json:"email"`
+	Password   string         `bson:"password" json:"-"`
+	Plan       UserPlan       `bson:"plan" json:"plan"`
+	Timezone   string         `bson:"timezone" json:"timezone"`
+	EndOfDay   int            `bson:"endOfDay" json:"endOfDay"`
+	Statistics UserStatistics `bson:"statistics" json:"statistics"`
 }
 
 type Deck struct {
