@@ -64,7 +64,7 @@ var TotalRepetitions = StatAchievement{
 var ActiveDays = StatAchievement{
 	id: "activeDays",
 	levelRequirements: []int{
-		3, 7, 14, 30, 50, 100, 200, 365, 500, 730, 1000,
+		3, 7, 14, 30, 50, 100, 150, 200, 300, 365, 500, 730, 1000,
 	},
 	getValue: func(user *mongo.User) int {
 		return len(user.Statistics.DailyRepetitions)
@@ -77,7 +77,7 @@ var ActiveDays = StatAchievement{
 var SingleDayRepetitions = StatAchievement{
 	id: "singleDayRepetitions",
 	levelRequirements: []int{
-		5, 20, 50, 100, 150, 200,
+		2, 5, 10, 20, 30, 50, 75, 100, 125, 150, 175, 200,
 	},
 	getValue: func(user *mongo.User) int {
 		maxRepetitions := 0
