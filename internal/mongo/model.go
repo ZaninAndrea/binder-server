@@ -41,14 +41,21 @@ type UserStatistics struct {
 	DailyRepetitions map[string]int `bson:"dailyRepetitions" json:"dailyRepetitions"`
 }
 
+type UserAchievements struct {
+	TotalRepetitions     int `bson:"totalRepetitions" json:"totalRepetitions"`
+	ActiveDays           int `bson:"activeDays" json:"activeDays"`
+	SingleDayRepetitions int `bson:"singleDayRepetitions" json:"singleDayRepetitions"`
+}
+
 type User struct {
-	BasicModel `bson:",inline"`
-	Email      string         `bson:"email" json:"email"`
-	Password   string         `bson:"password" json:"-"`
-	Plan       UserPlan       `bson:"plan" json:"plan"`
-	Timezone   string         `bson:"timezone" json:"timezone"`
-	EndOfDay   int            `bson:"endOfDay" json:"endOfDay"`
-	Statistics UserStatistics `bson:"statistics" json:"statistics"`
+	BasicModel   `bson:",inline"`
+	Email        string           `bson:"email" json:"email"`
+	Password     string           `bson:"password" json:"-"`
+	Plan         UserPlan         `bson:"plan" json:"plan"`
+	Timezone     string           `bson:"timezone" json:"timezone"`
+	EndOfDay     int              `bson:"endOfDay" json:"endOfDay"`
+	Statistics   UserStatistics   `bson:"statistics" json:"statistics"`
+	Achievements UserAchievements `bson:"achievements" json:"achievements"`
 }
 
 type Deck struct {

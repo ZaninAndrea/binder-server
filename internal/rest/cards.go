@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ZaninAndrea/binder-server/internal/achievements"
 	"github.com/ZaninAndrea/binder-server/internal/mongo"
 	"github.com/ZaninAndrea/binder-server/internal/mongo/op"
 	"github.com/gin-gonic/gin"
@@ -357,7 +358,7 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 			In(location).
 			Format("2006-01-02")
 
-		_, err = db.Transaction(
+		updates, err := db.Transaction(
 			30*time.Second,
 			func(db *mongo.Database, s mongo.SessionContext) (any, error) {
 				// Insert the new repetition
@@ -423,15 +424,39 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 					return nil, err
 				}
 
-				return nil, nil
+				var updatedUser mongo.User
+				err = db.Users.FindById(user.ID, &updatedUser)
+				if err != nil {
+					return nil, err
+				}
+
+				// Update the user's achievements if needed
+				updates := achievements.UpdateAchievements(&updatedUser)
+				if len(updates) > 0 {
+					mongoUpdates := bson.M{}
+					for _, update := range updates {
+						mongoUpdates["achievements."+update.ID] = update.Level
+					}
+
+					_, err = db.Users.UpdateById(user.ID, mongo.UpdateDocument{
+						op.Set: mongoUpdates,
+					})
+
+					if err != nil {
+						return nil, err
+					}
+				}
+
+				return updates, nil
 			},
 		)
+
 		if err != nil {
-			c.String(http.StatusInternalServerError, "Failed to record repetion")
+			c.String(http.StatusInternalServerError, "Failed to record repetition")
 			restLogger.Error(err)
 			return
 		}
 
-		c.String(http.StatusOK, "")
+		c.JSON(http.StatusOK, updates)
 	})
 }
