@@ -54,8 +54,8 @@ func processRepetitions(repetitions []*mongo.Repetition) bson.M {
 		}
 
 		usefulness := 10 * errorProbability(previousRepetition, repetition.Date, halfLife)
-		if usefulness > 2 {
-			usefulness = 2
+		if usefulness > 1.5 {
+			usefulness = 1.5
 		}
 
 		quality := float32(repetition.Quality)
@@ -70,7 +70,7 @@ func processRepetitions(repetitions []*mongo.Repetition) bson.M {
 		if repetition.Quality < 3 {
 			halfLife = halfLife / 2
 		} else {
-			halfLife = halfLife * lerp(1, factor*2, usefulness)
+			halfLife = halfLife * lerp(1, factor, usefulness)
 		}
 	}
 
