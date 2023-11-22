@@ -8,8 +8,8 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=/root/apis/binder-server/build/server
-WorkingDirectory=/root/apis/binder-server
+ExecStart=/home/andrea/apis/binder-server/build/server
+WorkingDirectory=/home/andrea/apis/binder-server
 
 [Install]
 WantedBy=multi-user.target
