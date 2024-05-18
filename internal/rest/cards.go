@@ -301,6 +301,253 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 		c.String(http.StatusOK, "")
 	})
 
+	r.PUT("/decks/:deckId/cards/:cardId/move", Authenticated([]string{"user"}), func(c *gin.Context) {
+		// Load user
+		exists, err, user := GetAuthenticatedUser(c, db)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to load the user")
+			restLogger.Error(err)
+			return
+		} else if !exists {
+			c.String(http.StatusUnauthorized, "The authentication token is associated with a non-existent user")
+			return
+		}
+
+		// Load deck
+		rawId := c.Param("deckId")
+		deckId, err := primitive.ObjectIDFromHex(rawId)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid deck id")
+			return
+		}
+
+		var deck mongo.Deck
+		exists, err = db.Decks.FindByIdIfExists(deckId, &deck)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to load the deck")
+			restLogger.Error(err)
+			return
+		} else if !exists {
+			c.String(http.StatusBadRequest, "The specified deck does not exist")
+			return
+		} else if deck.Owner != user.ID {
+			c.String(http.StatusUnauthorized, "You are not the owner of this deck")
+			return
+		}
+
+		// Load target deck
+		var payload struct {
+			NewDeckId string `json:"newDeckId"`
+		}
+		err = c.ShouldBindJSON(&payload)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid payload")
+			return
+		}
+
+		newDeckId, err := primitive.ObjectIDFromHex(payload.NewDeckId)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid new deck id")
+			return
+		}
+
+		var newDeck mongo.Deck
+		exists, err = db.Decks.FindByIdIfExists(newDeckId, &newDeck)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to load the new deck")
+			restLogger.Error(err)
+			return
+		} else if !exists {
+			c.String(http.StatusBadRequest, "The specified new deck does not exist")
+			return
+		} else if newDeck.Owner != user.ID {
+			c.String(http.StatusUnauthorized, "You are not the owner of the new deck")
+			return
+		}
+
+		cardId := c.Param("cardId")
+		// Apply update
+		_, err = db.Transaction(
+			30*time.Second,
+			func(db *mongo.Database, s mongo.SessionContext) (any, error) {
+				_, err := db.Decks.UpdateById(deck.ID, mongo.UpdateDocument{
+					op.Pull: bson.M{
+						"cards": bson.M{
+							"id": cardId,
+						},
+					},
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				var card mongo.Card
+				for _, c := range deck.Cards {
+					if c.ID == cardId {
+						card = c
+						break
+					}
+				}
+
+				_, err = db.Decks.UpdateById(newDeck.ID, mongo.UpdateDocument{
+					op.Push: bson.M{
+						"cards": card,
+					},
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				_, err = db.Repetitions.UpdateMany(bson.M{
+					"deckId": deck.ID,
+					"cardId": cardId,
+				}, mongo.UpdateDocument{
+					op.Set: bson.M{
+						"deckId": newDeck.ID,
+					},
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				return nil, nil
+			},
+		)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to delete card")
+			restLogger.Error(err)
+			return
+		}
+
+		c.String(http.StatusOK, "")
+	})
+
+	r.PUT("/decks/:deckId/cards/:cardId/copy", Authenticated([]string{"user"}), func(c *gin.Context) {
+		// Load user
+		exists, err, user := GetAuthenticatedUser(c, db)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to load the user")
+			restLogger.Error(err)
+			return
+		} else if !exists {
+			c.String(http.StatusUnauthorized, "The authentication token is associated with a non-existent user")
+			return
+		}
+
+		// Load deck
+		rawId := c.Param("deckId")
+		deckId, err := primitive.ObjectIDFromHex(rawId)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid deck id")
+			return
+		}
+
+		var deck mongo.Deck
+		exists, err = db.Decks.FindByIdIfExists(deckId, &deck)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to load the deck")
+			restLogger.Error(err)
+			return
+		} else if !exists {
+			c.String(http.StatusBadRequest, "The specified deck does not exist")
+			return
+		} else if deck.Owner != user.ID {
+			c.String(http.StatusUnauthorized, "You are not the owner of this deck")
+			return
+		}
+
+		// Load target deck
+		var payload struct {
+			NewDeckId string `json:"newDeckId"`
+		}
+		err = c.ShouldBindJSON(&payload)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid payload")
+			return
+		}
+
+		newDeckId, err := primitive.ObjectIDFromHex(payload.NewDeckId)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid new deck id")
+			return
+		}
+
+		var newDeck mongo.Deck
+		exists, err = db.Decks.FindByIdIfExists(newDeckId, &newDeck)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to load the new deck")
+			restLogger.Error(err)
+			return
+		} else if !exists {
+			c.String(http.StatusBadRequest, "The specified new deck does not exist")
+			return
+		} else if newDeck.Owner != user.ID {
+			c.String(http.StatusUnauthorized, "You are not the owner of the new deck")
+			return
+		}
+
+		cardId := c.Param("cardId")
+		// Apply update
+		_, err = db.Transaction(
+			30*time.Second,
+			func(db *mongo.Database, s mongo.SessionContext) (any, error) {
+				var card mongo.Card
+				for _, c := range deck.Cards {
+					if c.ID == cardId {
+						card = c
+						break
+					}
+				}
+
+				card.ID = uuid.NewString()
+
+				// Copy card
+				_, err = db.Decks.UpdateById(newDeck.ID, mongo.UpdateDocument{
+					op.Push: bson.M{
+						"cards": card,
+					},
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				// Copy repetitions
+				repetitions := []*mongo.Repetition{}
+				err = db.Repetitions.FindAll(bson.M{
+					"deckId": deck.ID,
+					"cardId": cardId,
+				}, &repetitions)
+				if err != nil {
+					return nil, err
+				}
+
+				for _, repetition := range repetitions {
+					repetition.ID = primitive.NilObjectID
+					repetition.DeckID = newDeck.ID
+					repetition.CardId = card.ID
+					_, err = db.Repetitions.InsertOne(repetition)
+					if err != nil {
+						return nil, err
+					}
+				}
+
+				err = db.Repetitions.InsertMany(repetitions)
+				if err != nil {
+					return nil, err
+				}
+
+				return nil, nil
+			},
+		)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to delete card")
+			restLogger.Error(err)
+			return
+		}
+
+		c.String(http.StatusOK, "")
+	})
+
 	r.POST("/decks/:deckId/cards/:cardId/repetition", Authenticated([]string{"user"}), func(c *gin.Context) {
 		// Load user
 		exists, err, user := GetAuthenticatedUser(c, db)

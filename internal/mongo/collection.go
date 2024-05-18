@@ -51,6 +51,27 @@ func (c *Collection[Record]) InsertOne(document Record) (primitive.ObjectID, err
 	return res.InsertedID.(primitive.ObjectID), nil
 }
 
+func (c *Collection[Record]) InsertMany(documents []Record) error {
+	ctx, cancel := c.GetTimeoutContext()
+
+	docs := make([]interface{}, len(documents))
+	for i := range documents {
+		documents[i].SetID(primitive.NilObjectID)
+		documents[i].SetCreatedAt(time.Now())
+		documents[i].SetUpdatedAt(time.Now())
+		docs[i] = documents[i]
+	}
+
+	_, err := c.collection.InsertMany(ctx, docs)
+	cancel()
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *Collection[Record]) InsertOneIfNotExists(filter interface{}, document Record) (primitive.ObjectID, bool, error) {
 	ctx, cancel := c.GetTimeoutContext()
 
@@ -174,6 +195,37 @@ func (c *Collection[Record]) UpdateOne(filter interface{}, update UpdateDocument
 	}
 
 	res, err := c.collection.UpdateOne(ctx, filter, update, opts...)
+	if err != nil {
+		return nil, err
+	}
+	cancel()
+
+	return res, nil
+}
+
+func (c *Collection[Record]) UpdateMany(filter interface{}, update UpdateDocument, opts ...*options.UpdateOptions) (*mongo.UpdateResult, error) {
+	ctx, cancel := c.GetTimeoutContext()
+
+	// Modify the update document to ensure that the createdAt
+	// and updatedAt fields are updated correctly
+	if set, ok := update[op.Set]; ok {
+		if _, ok := set["updatedAt"]; !ok {
+			set["updatedAt"] = time.Now()
+		}
+	} else if setOnInsert, ok := update[op.SetOnInsert]; ok {
+		if _, ok := setOnInsert["createdAt"]; !ok {
+			setOnInsert["createdAt"] = time.Now()
+		}
+		if _, ok := setOnInsert["updatedAt"]; !ok {
+			setOnInsert["updatedAt"] = time.Now()
+		}
+	} else {
+		update[op.Set] = bson.M{
+			"updatedAt": time.Now(),
+		}
+	}
+
+	res, err := c.collection.UpdateMany(ctx, filter, update, opts...)
 	if err != nil {
 		return nil, err
 	}
