@@ -1,4 +1,4 @@
-ssh -t shipyard 'echo "== Connecting to remote server ==" \
+ssh -t raspberrypi.baida.dev 'echo "== Connecting to remote server ==" \
     && cd ~/apis/binder-server \
     && echo "== Fetching latest version from git ==" \
     && git pull \
