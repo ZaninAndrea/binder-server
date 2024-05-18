@@ -367,7 +367,7 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 
 		cardId := c.Param("cardId")
 		// Apply update
-		_, err = db.Transaction(
+		newCard, err := db.Transaction(
 			30*time.Second,
 			func(db *mongo.Database, s mongo.SessionContext) (any, error) {
 				_, err := db.Decks.UpdateById(deck.ID, mongo.UpdateDocument{
@@ -410,16 +410,16 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 					return nil, err
 				}
 
-				return nil, nil
+				return card, nil
 			},
 		)
 		if err != nil {
-			c.String(http.StatusInternalServerError, "Failed to delete card")
+			c.String(http.StatusInternalServerError, "Failed to copy card")
 			restLogger.Error(err)
 			return
 		}
 
-		c.String(http.StatusOK, "")
+		c.JSON(http.StatusOK, newCard)
 	})
 
 	r.PUT("/decks/:deckId/cards/:cardId/copy", Authenticated([]string{"user"}), func(c *gin.Context) {
@@ -488,7 +488,7 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 
 		cardId := c.Param("cardId")
 		// Apply update
-		_, err = db.Transaction(
+		card, err := db.Transaction(
 			30*time.Second,
 			func(db *mongo.Database, s mongo.SessionContext) (any, error) {
 				var card mongo.Card
@@ -521,22 +521,24 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 					return nil, err
 				}
 
-				for _, repetition := range repetitions {
-					repetition.ID = primitive.NilObjectID
-					repetition.DeckID = newDeck.ID
-					repetition.CardId = card.ID
-					_, err = db.Repetitions.InsertOne(repetition)
+				if len(repetitions) > 0 {
+					for _, repetition := range repetitions {
+						repetition.ID = primitive.NilObjectID
+						repetition.DeckID = newDeck.ID
+						repetition.CardId = card.ID
+						_, err = db.Repetitions.InsertOne(repetition)
+						if err != nil {
+							return nil, err
+						}
+					}
+
+					err = db.Repetitions.InsertMany(repetitions)
 					if err != nil {
 						return nil, err
 					}
 				}
 
-				err = db.Repetitions.InsertMany(repetitions)
-				if err != nil {
-					return nil, err
-				}
-
-				return nil, nil
+				return card, nil
 			},
 		)
 		if err != nil {
@@ -545,7 +547,7 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 			return
 		}
 
-		c.String(http.StatusOK, "")
+		c.JSON(http.StatusOK, card)
 	})
 
 	r.POST("/decks/:deckId/cards/:cardId/repetition", Authenticated([]string{"user"}), func(c *gin.Context) {
