@@ -11,6 +11,7 @@ import (
 	"github.com/ZaninAndrea/binder-server/internal/mongo/op"
 	"github.com/gin-gonic/gin"
 	uuid "github.com/google/uuid"
+	"github.com/open-spaced-repetition/go-fsrs"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/exp/slices"
@@ -25,7 +26,17 @@ func errorProbability(previousRepetition time.Time, time time.Time, halfLife flo
 	return float32(1 - math.Pow(2, float64(-delay/halfLife)))
 }
 
-func processRepetitions(repetitions []*mongo.Repetition) bson.M {
+func qualityToRating(quality int) fsrs.Rating {
+	if quality < 2 {
+		return fsrs.Again
+	} else if quality == 2 {
+		return fsrs.Hard
+	} else {
+		return fsrs.Easy
+	}
+}
+
+func ProcessRepetitions(repetitions []*mongo.Repetition) bson.M {
 	slices.SortFunc(repetitions, func(a, b *mongo.Repetition) bool {
 		if a == nil {
 			return true
@@ -36,47 +47,20 @@ func processRepetitions(repetitions []*mongo.Repetition) bson.M {
 		return a.Date.Before(b.Date)
 	})
 
-	var factor float32 = 0
-	var halfLife float32 = 0
-	var previousRepetition time.Time
+	var card fsrs.Card = fsrs.NewCard()
 	var correctRepetitions int = 0
 
-	for i, repetition := range repetitions {
+	model := fsrs.DefaultParam()
+	for _, repetition := range repetitions {
 		if repetition.Quality >= 3 {
 			correctRepetitions++
 		}
 
-		if i == 0 {
-			factor = 2.5
-			halfLife = 6.58 * 24 * 3600 * 1000
-			previousRepetition = repetition.Date
-			continue
-		}
-
-		usefulness := 10 * errorProbability(previousRepetition, repetition.Date, halfLife)
-		if usefulness > 1.5 {
-			usefulness = 1.5
-		}
-
-		quality := float32(repetition.Quality)
-		factorUpdate := 0.1 - (5-quality)*(0.08+(5-quality)*0.02)
-		factor = factor + factorUpdate*usefulness
-		if factor < 1.3 {
-			factor = 1.3
-		} else if factor > 2.5 {
-			factor = 2.5
-		}
-
-		if repetition.Quality < 3 {
-			halfLife = halfLife / 2
-		} else {
-			halfLife = halfLife * lerp(1, factor, usefulness)
-		}
+		card = model.Repeat(card, repetition.Date)[qualityToRating(repetition.Quality)].Card
 	}
 
 	update := bson.M{
-		"cards.$.factor":             factor,
-		"cards.$.halfLife":           halfLife,
+		"cards.$.fsrs":               card,
 		"cards.$.totalRepetitions":   len(repetitions),
 		"cards.$.correctRepetitions": correctRepetitions,
 	}
@@ -137,12 +121,11 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 			ID:                 cardId,
 			Front:              payload.Front,
 			Back:               payload.Back,
-			Factor:             2.5,
 			LastRepetition:     nil,
-			HalfLife:           0,
 			TotalRepetitions:   0,
 			CorrectRepetitions: 0,
 			Paused:             false,
+			FSRS:               fsrs.NewCard(),
 		}
 
 		// Add card
@@ -522,17 +505,16 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 				}
 
 				if len(repetitions) > 0 {
+					updatedReps := make([]*mongo.Repetition, 0)
 					for _, repetition := range repetitions {
 						repetition.ID = primitive.NilObjectID
 						repetition.DeckID = newDeck.ID
 						repetition.CardId = card.ID
-						_, err = db.Repetitions.InsertOne(repetition)
-						if err != nil {
-							return nil, err
-						}
+
+						updatedReps = append(updatedReps, repetition)
 					}
 
-					err = db.Repetitions.InsertMany(repetitions)
+					err = db.Repetitions.InsertMany(updatedReps)
 					if err != nil {
 						return nil, err
 					}
@@ -632,7 +614,7 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 					return nil, err
 				}
 
-				cardUpdate := processRepetitions(repetitions)
+				cardUpdate := ProcessRepetitions(repetitions)
 
 				// Update the card with the new half-life and factor
 				_, err = db.Decks.UpdateOne(bson.M{

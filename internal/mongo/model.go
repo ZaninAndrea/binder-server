@@ -3,6 +3,7 @@ package mongo
 import (
 	"time"
 
+	"github.com/open-spaced-repetition/go-fsrs"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -70,12 +71,11 @@ type Card struct {
 	ID                 string     `bson:"id" json:"id"`
 	Front              string     `bson:"front" json:"front"`
 	Back               string     `bson:"back" json:"back"`
-	Factor             float32    `bson:"factor" json:"factor"`
-	HalfLife           float32    `bson:"halfLife" json:"halfLife"`
 	TotalRepetitions   float32    `bson:"totalRepetitions" json:"totalRepetitions"`
 	CorrectRepetitions float32    `bson:"correctRepetitions" json:"correctRepetitions"`
 	LastRepetition     *time.Time `bson:"lastRepetition" json:"lastRepetition"`
 	Paused             bool       `bson:"paused" json:"paused"`
+	FSRS               fsrs.Card  `bson:"fsrs" json:"fsrs"`
 }
 
 type Repetition struct {
