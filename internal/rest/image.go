@@ -27,14 +27,14 @@ func ReplaceBase64ImagesWithFileLinks(content string, storage *storage.BlobStora
 					imageType := strings.Split(attr.Val, ";")[0][EXTENSION_START_POS:]
 
 					// Upload the image to the server
-					imageContent := strings.SplitN(attr.Val, "base64", 2)[1]
+					imageContent := strings.SplitN(attr.Val, "base64", 2)[1][1:]
 					ID := uuid.NewString() + "." + imageType
 					data, err := base64.StdEncoding.DecodeString(imageContent)
 					if err != nil {
 						return err
 					}
 
-					err = storage.Upload("image."+imageType, bytes.NewReader(data))
+					err = storage.Upload(ID, bytes.NewReader(data))
 					if err != nil {
 						return err
 					}
