@@ -9,6 +9,7 @@ import (
 	"github.com/ZaninAndrea/binder-server/internal/achievements"
 	"github.com/ZaninAndrea/binder-server/internal/mongo"
 	"github.com/ZaninAndrea/binder-server/internal/mongo/op"
+	"github.com/ZaninAndrea/binder-server/storage"
 	"github.com/gin-gonic/gin"
 	uuid "github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
@@ -87,7 +88,7 @@ func processRepetitions(repetitions []*mongo.Repetition) bson.M {
 	return update
 }
 
-func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
+func setupCardRoutes(r *gin.Engine, db *mongo.Database, storage *storage.BlobStorage) {
 	r.POST("/decks/:deckId/cards", Authenticated([]string{"user"}), func(c *gin.Context) {
 		// Load user
 		exists, err, user := GetAuthenticatedUser(c, db)
@@ -133,10 +134,22 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 			return
 		}
 		cardId := uuid.NewString()
+		front, err := ReplaceBase64ImagesWithFileLinks(payload.Front, storage)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to replace base64 images with file links")
+			restLogger.Error(err)
+			return
+		}
+		back, err := ReplaceBase64ImagesWithFileLinks(payload.Back, storage)
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Failed to replace base64 images with file links")
+			restLogger.Error(err)
+			return
+		}
 		newCard := mongo.Card{
 			ID:                 cardId,
-			Front:              payload.Front,
-			Back:               payload.Back,
+			Front:              front,
+			Back:               back,
 			Factor:             2.5,
 			LastRepetition:     nil,
 			HalfLife:           0,
@@ -207,10 +220,22 @@ func setupCardRoutes(r *gin.Engine, db *mongo.Database) {
 		}
 		update := bson.M{}
 		if payload.Front != nil {
-			update["cards.$.front"] = payload.Front
+			front, err := ReplaceBase64ImagesWithFileLinks(*payload.Front, storage)
+			if err != nil {
+				c.String(http.StatusInternalServerError, "Failed to replace base64 images with file links")
+				restLogger.Error(err)
+				return
+			}
+			update["cards.$.front"] = front
 		}
 		if payload.Back != nil {
-			update["cards.$.back"] = payload.Back
+			back, err := ReplaceBase64ImagesWithFileLinks(*payload.Back, storage)
+			if err != nil {
+				c.String(http.StatusInternalServerError, "Failed to replace base64 images with file links")
+				restLogger.Error(err)
+				return
+			}
+			update["cards.$.back"] = back
 		}
 		if payload.Paused != nil {
 			update["cards.$.paused"] = payload.Paused

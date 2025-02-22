@@ -9,6 +9,7 @@ import (
 	"github.com/ZaninAndrea/binder-server/internal/log"
 	"github.com/ZaninAndrea/binder-server/internal/mongo"
 	"github.com/ZaninAndrea/binder-server/internal/rest"
+	"github.com/ZaninAndrea/binder-server/storage"
 	"github.com/dyson/certman"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,15 @@ func main() {
 	db := mongo.Connect(mongoUri, mongoDatabase)
 	defer db.Disconnect()
 
+	// Setup the Blob Storage
+	storageAccount := os.Getenv("BLOB_STORAGE_ACCOUNT")
+	storageKey := os.Getenv("BLOB_STORAGE_KEY")
+	imagesStorage, err := storage.NewBlobStorage(storageAccount, storageKey, "images")
+	if err != nil {
+		mainLogger.Error(err)
+		panic(err)
+	}
+
 	// Setup the HTTP server allowing all CORS
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
@@ -39,7 +49,7 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-	rest.SetupRoutes(router, db)
+	rest.SetupRoutes(router, db, imagesStorage)
 
 	// Serving the .well-known route to allow automatic
 	// Let's Encrypt certificate renewal
